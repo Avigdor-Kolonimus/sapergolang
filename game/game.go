@@ -14,9 +14,10 @@ const (
 
 func NewGame() *GameState {
 	g := &GameState{
-		rows:  9,
-		cols:  9,
-		mines: 10,
+		rows:          9,
+		cols:          9,
+		mines:         10,
+		selectedLevel: levelBeginner,
 	}
 
 	g.reset()

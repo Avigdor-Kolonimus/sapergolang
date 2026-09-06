@@ -7,6 +7,13 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
+const (
+	levelNone = iota
+	levelBeginner
+	levelIntermediate
+	levelExpert
+)
+
 type point struct {
 	hasMine     bool
 	opened      bool
@@ -15,15 +22,16 @@ type point struct {
 }
 
 type GameState struct {
-	menu       bool
-	gameOver   bool
-	gameWon    bool
-	rows       int
-	cols       int
-	mines      int
-	field      [][]point
-	startedAt  time.Time
-	finishedAt time.Time
+	menu          bool
+	gameOver      bool
+	gameWon       bool
+	rows          int
+	cols          int
+	mines         int
+	selectedLevel int
+	field         [][]point
+	startedAt     time.Time
+	finishedAt    time.Time
 }
 
 func (g *GameState) isGameWon() bool {
@@ -43,11 +51,15 @@ func (g *GameState) isGameWon() bool {
 
 func (g *GameState) getStatus() string {
 	fps := rl.GetFPS()
+	return calculateStatus(g.gameOver, g.gameWon, fps, g.startedAt, g.finishedAt)
+}
+
+func calculateStatus(gameOver, gameWon bool, fps int32, startedAt, finishedAt time.Time) string {
 	var elapsed time.Duration
-	if g.gameOver || g.gameWon {
-		elapsed = g.finishedAt.Sub(g.startedAt)
+	if gameOver || gameWon {
+		elapsed = finishedAt.Sub(startedAt)
 	} else {
-		elapsed = time.Since(g.startedAt)
+		elapsed = time.Since(startedAt)
 	}
 
 	return fmt.Sprintf("FPS: %d, TIME: %.2f", fps, elapsed.Seconds())

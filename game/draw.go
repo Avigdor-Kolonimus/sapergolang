@@ -56,32 +56,78 @@ func (g *GameState) revealTile(x, y int) {
 	}
 }
 
+func colorValue(c rl.Color) gui.PropertyValue {
+	return gui.PropertyValue(rl.ColorToInt(c))
+}
+
+func setSelectedButtonStyle() {
+	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_NORMAL, colorValue(rl.Green))
+	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_FOCUSED, colorValue(rl.Green))
+	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_PRESSED, colorValue(rl.DarkGreen))
+}
+
+func setDefaultButtonStyle() {
+	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_NORMAL, colorValue(rl.Gray))
+	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_FOCUSED, colorValue(rl.LightGray))
+	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_PRESSED, colorValue(rl.DarkGray))
+}
+
 func (g *GameState) drawMenu() {
 	var (
 		rowSpacing float32 = 50
 		baseY      float32 = 50
 	)
 
+	// BEGINNER
+	if g.selectedLevel == levelBeginner {
+		setSelectedButtonStyle()
+	} else {
+		setDefaultButtonStyle()
+	}
+
 	if clicked := gui.Button(rl.NewRectangle(0, baseY, winWidth, size), "BEGINNER"); clicked {
+		g.selectedLevel = levelBeginner
 		g.rows = biginnerRows
 		g.cols = biginnerCols
 		g.mines = biginnerMines
 	}
+
 	baseY += rowSpacing
 
+	// INTERMEDIATE
+	if g.selectedLevel == levelIntermediate {
+		setSelectedButtonStyle()
+	} else {
+		setDefaultButtonStyle()
+	}
+
 	if clicked := gui.Button(rl.NewRectangle(0, baseY, winWidth, size), "INTERMEDIATE"); clicked {
+		g.selectedLevel = levelIntermediate
 		g.rows = intermediateRows
 		g.cols = intermediateCols
 		g.mines = intermediateMines
 	}
+
 	baseY += rowSpacing
 
+	// EXPERT
+	if g.selectedLevel == levelExpert {
+		setSelectedButtonStyle()
+	} else {
+		setDefaultButtonStyle()
+	}
+
 	if clicked := gui.Button(rl.NewRectangle(0, baseY, winWidth, size), "EXPERT"); clicked {
+		g.selectedLevel = levelExpert
 		g.rows = expertRows
 		g.cols = expertCols
 		g.mines = expertMines
 	}
+
 	baseY += rowSpacing * 2
+
+	// START
+	setDefaultButtonStyle()
 
 	if clicked := gui.Button(rl.NewRectangle(0, baseY, winWidth, size), "START"); clicked {
 		g.start()
