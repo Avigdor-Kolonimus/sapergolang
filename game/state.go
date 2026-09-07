@@ -64,18 +64,3 @@ func calculateStatus(gameOver, gameWon bool, fps int32, startedAt, finishedAt ti
 
 	return fmt.Sprintf("FPS: %d, TIME: %.2f", fps, elapsed.Seconds())
 }
-
-func (g *GameState) doForNeighbours(x, y int, do func(x, y int)) {
-	// with diagonals
-	dx := []int{-1, 0, 1, -1, 1, -1, 0, 1}
-	dy := []int{-1, -1, -1, 0, 0, 1, 1, 1}
-
-	for i := range len(dx) {
-		nx := x + dx[i]
-		ny := y + dy[i]
-
-		if nx >= 0 && nx < g.rows && ny >= 0 && ny < g.cols {
-			do(nx, ny)
-		}
-	}
-}

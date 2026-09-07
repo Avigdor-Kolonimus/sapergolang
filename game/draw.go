@@ -2,7 +2,6 @@ package game
 
 import (
 	"fmt"
-	"time"
 
 	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -10,18 +9,6 @@ import (
 
 const (
 	size = 30
-
-	biginnerRows  = 9
-	biginnerCols  = 9
-	biginnerMines = 10
-
-	intermediateRows  = 16
-	intermediateCols  = 16
-	intermediateMines = 40
-
-	expertRows  = 30
-	expertCols  = 30
-	expertMines = 99
 )
 
 func (g *GameState) getWidth() int {
@@ -32,41 +19,19 @@ func (g *GameState) getHeight() int {
 	return size*g.rows + size
 }
 
-func (g *GameState) revealTile(x, y int) {
-	if g.field[x][y].opened {
-		return
-	}
-
-	g.field[x][y].opened = true
-
-	if g.field[x][y].hasMine {
-		g.gameOver = true
-		g.finishedAt = time.Now()
-
-		return
-	}
-
-	g.gameWon = g.isGameWon()
-
-	// No neighbors, reveal all adjacent tiles recursively
-	if g.field[x][y].minesAround == 0 {
-		g.doForNeighbours(x, y, func(nx, ny int) {
-			g.revealTile(nx, ny)
-		})
-	}
-}
-
 func colorValue(c rl.Color) gui.PropertyValue {
 	return gui.PropertyValue(rl.ColorToInt(c))
 }
 
-func setSelectedButtonStyle() {
-	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_NORMAL, colorValue(rl.Green))
-	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_FOCUSED, colorValue(rl.Green))
-	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_PRESSED, colorValue(rl.DarkGreen))
-}
+func setButtonStyle(selected bool) {
+	if selected {
+		gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_NORMAL, colorValue(rl.Green))
+		gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_FOCUSED, colorValue(rl.Green))
+		gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_PRESSED, colorValue(rl.DarkGreen))
 
-func setDefaultButtonStyle() {
+		return
+	}
+
 	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_NORMAL, colorValue(rl.Gray))
 	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_FOCUSED, colorValue(rl.LightGray))
 	gui.SetStyle(gui.BUTTON, gui.BASE_COLOR_PRESSED, colorValue(rl.DarkGray))
@@ -79,55 +44,34 @@ func (g *GameState) drawMenu() {
 	)
 
 	// BEGINNER
-	if g.selectedLevel == levelBeginner {
-		setSelectedButtonStyle()
-	} else {
-		setDefaultButtonStyle()
-	}
+	setButtonStyle(g.selectedLevel == levelBeginner)
 
 	if clicked := gui.Button(rl.NewRectangle(0, baseY, winWidth, size), "BEGINNER"); clicked {
-		g.selectedLevel = levelBeginner
-		g.rows = biginnerRows
-		g.cols = biginnerCols
-		g.mines = biginnerMines
+		g.selectLevel(levelBeginner)
 	}
 
 	baseY += rowSpacing
 
 	// INTERMEDIATE
-	if g.selectedLevel == levelIntermediate {
-		setSelectedButtonStyle()
-	} else {
-		setDefaultButtonStyle()
-	}
+	setButtonStyle(g.selectedLevel == levelIntermediate)
 
 	if clicked := gui.Button(rl.NewRectangle(0, baseY, winWidth, size), "INTERMEDIATE"); clicked {
-		g.selectedLevel = levelIntermediate
-		g.rows = intermediateRows
-		g.cols = intermediateCols
-		g.mines = intermediateMines
+		g.selectLevel(levelIntermediate)
 	}
 
 	baseY += rowSpacing
 
 	// EXPERT
-	if g.selectedLevel == levelExpert {
-		setSelectedButtonStyle()
-	} else {
-		setDefaultButtonStyle()
-	}
+	setButtonStyle(g.selectedLevel == levelExpert)
 
 	if clicked := gui.Button(rl.NewRectangle(0, baseY, winWidth, size), "EXPERT"); clicked {
-		g.selectedLevel = levelExpert
-		g.rows = expertRows
-		g.cols = expertCols
-		g.mines = expertMines
+		g.selectLevel(levelExpert)
 	}
 
 	baseY += rowSpacing * 2
 
 	// START
-	setDefaultButtonStyle()
+	setButtonStyle(false)
 
 	if clicked := gui.Button(rl.NewRectangle(0, baseY, winWidth, size), "START"); clicked {
 		g.start()
@@ -135,75 +79,135 @@ func (g *GameState) drawMenu() {
 }
 
 func (g *GameState) drawCongratulations() {
-	var lineHeight int32 = 50
-	w := winWidth
+	const (
+		lineHeight int32 = 50
+		fontSize   int32 = 40
+	)
 
-	if g.gameWon {
-		rl.DrawText("WELL DONE !", 0, lineHeight, size, rl.White)
-	}
+	text := "WELL DONE!"
 
-	clicked := gui.Button(rl.NewRectangle(0, float32(2*lineHeight), float32(w), size), "PLAY AGAIN")
+	textWidth := rl.MeasureText(text, fontSize)
+	textX := (winWidth - textWidth) / 2
+
+	rl.DrawText(text, textX, lineHeight, fontSize, rl.White)
+
+	buttonWidth := float32(200)
+	buttonHeight := float32(size)
+
+	buttonX := (float32(winWidth) - buttonWidth) / 2
+	buttonY := float32(2 * lineHeight)
+
+	clicked := gui.Button(rl.NewRectangle(buttonX, buttonY, buttonWidth, buttonHeight), "PLAY AGAIN")
 	if clicked {
 		g.reset()
 	}
+}
+
+func (g *GameState) handleCellClick(x, y int, rect rl.Rectangle) {
+	if !rl.CheckCollisionPointRec(rl.GetMousePosition(), rect) {
+		return
+	}
+
+	left := rl.IsMouseButtonPressed(rl.MouseButtonLeft)
+	right := rl.IsMouseButtonPressed(rl.MouseButtonRight)
+
+	cell := &g.field[x][y]
+
+	if left && right {
+		if cell.opened {
+			g.chordCell(x, y)
+		}
+
+		return
+	}
+
+	if right {
+		if !cell.opened {
+			cell.marked = !cell.marked
+		}
+
+		return
+	}
+
+	if left && !cell.opened && !cell.marked {
+		g.revealTile(x, y)
+	}
+}
+
+func (g *GameState) drawCell(x, y int, rect rl.Rectangle) {
+	cell := &g.field[x][y]
+
+	if cell.marked {
+		rl.DrawText("M", 5+int32(x)*size, 5+int32(y)*size, 20, rl.Violet)
+
+		return
+	}
+
+	if cell.opened {
+		text := ""
+		if cell.minesAround > 0 {
+			text = fmt.Sprintf("%d", cell.minesAround)
+		}
+
+		rl.DrawText(text, 5+int32(x)*size, 5+int32(y)*size, 20, getTextColor(cell.minesAround))
+
+		return
+	}
+
+	rl.DrawRectangleRec(rect, rl.Gray)
+}
+
+func (g *GameState) drawGameOverCell(x, y int) {
+	var (
+		text  string
+		color rl.Color
+	)
+
+	cell := &g.field[x][y]
+	if cell.hasMine {
+		text = "*"
+		color = rl.Red
+	} else if cell.minesAround > 0 {
+		text = fmt.Sprintf("%d", cell.minesAround)
+		color = getTextColor(cell.minesAround)
+	}
+
+	rl.DrawText(text, 5+int32(x)*size, 5+int32(y)*size, 20, color)
 }
 
 func (g *GameState) drawField() {
 	w := float32(g.getWidth())
 	h := float32(g.getHeight())
 
-	gui.StatusBar(rl.NewRectangle(0, h-size, w, size), g.getStatus())
-	if restart := gui.Button(rl.NewRectangle(w-65, h-size+5, 60, size-10), "RESTART"); restart {
-		g.reset()
+	gui.StatusBar(
+		rl.NewRectangle(0, h-size, w, size),
+		g.getStatus(),
+	)
 
+	if restart := gui.Button(
+		rl.NewRectangle(w-65, h-size+5, 60, size-10),
+		"RESTART",
+	); restart {
+		g.reset()
 		return
 	}
 
 	for x := range g.field {
 		for y := range g.field[x] {
 			if g.gameOver {
-				var (
-					text  string
-					color rl.Color
-				)
-
-				if g.field[x][y].hasMine {
-					text = "*"
-					color = rl.Red
-				} else if g.field[x][y].minesAround > 0 {
-					color = getTextColor(g.field[x][y].minesAround)
-					text = fmt.Sprintf("%d", g.field[x][y].minesAround)
-				}
-
-				rl.DrawText(text, 5+int32(x)*size, 5+int32(y)*size, 20, color)
+				g.drawGameOverCell(x, y)
 				continue
 			}
 
-			rect := rl.NewRectangle(float32(x*size), float32(y*size), size, size)
+			rect := rl.NewRectangle(
+				float32(x*size),
+				float32(y*size),
+				size,
+				size,
+			)
 
-			// Mark on right mouse button
-			if rl.IsMouseButtonPressed(rl.MouseButtonRight) {
-				if rl.CheckCollisionPointRec(rl.GetMousePosition(), rect) {
-					if !g.field[x][y].opened {
-						g.field[x][y].marked = !g.field[x][y].marked
-					}
-				}
-			}
-
-			if g.field[x][y].marked {
-				rl.DrawText("M", 5+int32(x)*size, 5+int32(y)*size, 20, rl.Violet)
-			} else if g.field[x][y].opened {
-				text := ""
-				if g.field[x][y].minesAround > 0 {
-					text = fmt.Sprintf("%d", g.field[x][y].minesAround)
-				}
-
-				rl.DrawText(text, 5+int32(x)*size, 5+int32(y)*size, 20, getTextColor(g.field[x][y].minesAround))
-			} else {
-				if open := gui.Button(rect, ""); open {
-					g.revealTile(x, y)
-				}
-			}
+			g.handleCellClick(x, y, rect)
+			g.drawCell(x, y, rect)
 		}
 	}
 }
